@@ -1,0 +1,830 @@
+---
+title: "Wine Quality - Six Sigma Analysis"
+author: "Miriam Pavón Buenache"
+date: "15/5/2021"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Define Phase
+
+Define phase is the first phase of the DMAIC project and a Six Sigma Process. It is important to understand what key output metric, (in Six Sigma referred to as Y) to be improved. The key points of this phase are:
+
+- The project charter is created where the problem that needs to be solved is defined, the key project metrics are determined, goals, etc. 
+- The SIPOC, Supplier-Input-Process-Output-Customer, process map 
+- Voice of Customer and CTQs, which allow us to determine the project metric (Y)
+
+### 1.1 Problem Statement
+
+The wine factory produces a high standard of wine and exports it to Italy, Spain and Switzerland. This wine production is a beverage made from fermented grape and other fruit juices with lower amount of alcohol. 
+
+The selection of the problem to be solved is based on Voice of Customer (VOC) from a dataset of the past two years. The consumers want a high quality wine, which means that they want wine with a great taste, flavour and appearance. Based on this database, the low quality rate has been recorded only for the black and red wine product. The current quality average rate is 5.8 with a standard deviation of +- 1. The specifications required to meet the VoC and factory commitments is a quality of 7.
+
+
+### 1.2 Voice of Customer and CTQs
+
+A Critical to Quality Tree (also known as a CTQ Tree) is a Six Sigma tool used to identify the needs of the customer and translate that information into measurable product and process requirements. It allows organizations to understand the characteristics of a product or service that most drives quality for customers.
+
+Before initiating any process improvement project, it’s important for a business to determine the characteristics of the product or service that are critical to quality as judged by customers – this is known as CTQ.
+
+Creating a CTQ Tree determines the drivers behind those characteristics and helps companies find ways to meet them. In this case this is the CTQ Defined:
+
+Need from the customer: "I, as a customer, want a high quality wine"
+
+So the CTQs defined are:
+
+- Taste
+- Flavour
+- Appearance
+
+So, the different typical features like alcohol, density, citic acid, etc will be the variables Xs influencing the CTQs.
+
+These factors will affect to the result of the taste, appearance and flavour of the final wine and consequently, in the customer satisfaction.
+
+### 1.3 High Level Process (SIPOC)
+
+The SIPOC (Supplier, Input, Process, Output, Customer)is a high level process map and allow to identify the process boundaries (start/stop), create a common understanding about the process, locate the problem in a context and become familiar with inputs and outputs at each step of the process
+
+![](sipoc.png)
+
+## 2. Measure Phase
+
+### 2.1 Data Preparation
+
+```{r load-packages, echo=FALSE, message = FALSE}
+# load libraries
+library(tidyverse)
+library(dplyr)
+library(ggthemes)
+library(DT)
+library(lubridate)
+library(nortest)
+library(highcharter)
+library(grid)
+library(gridExtra)
+library(qqplotr)
+library(corrplot)
+library(magrittr)
+library(multipanelfigure)
+library(moments)
+library(caret)
+library(e1071)
+library(qcc)
+```
+####  Data
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+setwd("~/R/Github Project/Wine Quality")
+data <- read.csv("winequalityN.csv")
+
+```
+
+### 2.2 Data Cleaning
+
+#### 2.2.1 Removing the Duplicate Rows
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+data <- data[!duplicated(data), ]
+dim(data)
+```
+The rows got reduced to 5329 after removing the duplicate information.
+
+#### 2.2.2 Missing Values
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+colSums(is.na(data))
+```
+
+
+### 2.3 Variables Identification
+
+- Input variables (based on physicochemical tests):
+
+   1 - fixed acidity (tartaric acid - g / dm^3)
+   
+   2 - volatile acidity (acetic acid - g / dm^3)
+   
+   3 - citric acid (g / dm^3)
+   
+   4 - residual sugar (g / dm^3)
+   
+   5 - chlorides (sodium chloride - g / dm^3)
+   
+   6 - free sulfur dioxide (mg / dm^3)
+   
+   7 - total sulfur dioxide (mg / dm^3)
+   
+   8 - density (g / cm^3)
+   
+   9 - pH
+   
+   10 - sulphates (potassium sulphate - g / dm3)
+   
+   11 - alcohol (% by volume)
+   
+- Output variable (based on sensory data):
+
+   12 - quality (score between 0 and 10)
+
+### 2.4 Explanatory Data Analysis
+
+### 2.4.1 Data Summary
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+summary(data)
+```
+
+
+### 2.4.2 Distribution of Single Variables (Histograms)
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+
+p1 <- ggplot(data, aes(x=pH, y=..count.., fill = type)) + 
+  geom_histogram(position="dodge") +
+     labs(title="pH distribution",  subtitle = "Histogram Chart",
+       x = "pH", y = "Frequency", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") 
+
+p2 <- ggplot(data, aes(x=free.sulfur.dioxide, y=..count.., fill = type)) + 
+  geom_histogram(position="dodge") +
+     labs(title="Free SO2 distribution",  subtitle = "Histogram Chart",
+       x = "pH", y = "Frequency", fill = "Type") +
+  scale_fill_brewer(palette = "Set1")
+
+p3 <- ggplot(data, aes(x=fixed.acidity, y=..count.., fill = type)) + 
+  geom_histogram(position="dodge") +
+     labs(title="Free SO2 distribution",  subtitle = "Histogram Chart",
+       x = "Free SO2", y = "Frequency", fill = "Type") +
+  scale_fill_brewer(palette = "Set1")
+
+p4 <- ggplot(data, aes(x=volatile.acidity, y=..count.., fill = type)) + 
+  geom_histogram(position="dodge") +
+     labs(title="Volatile Acidity distribution",  subtitle = "Histogram Chart",
+       x = "Volatile Acidity", y = "Frequency", fill = "Type") +
+  scale_fill_brewer(palette = "Set1")
+
+p5 <- ggplot(data, aes(x=residual.sugar, y=..count.., fill = type)) + 
+  geom_histogram(position="dodge") +
+     labs(title="Residual sugar distribution",  subtitle = "Histogram Chart",
+       x = "Residual sugar", y = "Frequency", fill = "Type") +
+  scale_fill_brewer(palette = "Set1")
+
+p6 <- ggplot(data, aes(x=density, y=..count.., fill = type)) + 
+  geom_histogram(position="dodge") +
+     labs(title="Density distribution",  subtitle = "Histogram Chart",
+       x = "Density", y = "Frequency", fill = "Type") +
+  scale_fill_brewer(palette = "Set1")
+
+p7 <- ggplot(data, aes(x=alcohol, y=..count.., fill = type)) + 
+  geom_histogram(position="dodge") +
+     labs(title="Alcohol distribution",  subtitle = "Histogram Chart",
+       x = "Alcohol", y = "Frequency", fill = "Type") +
+  scale_fill_brewer(palette = "Set1")
+
+p8 <- ggplot(data, aes(x=chlorides, y=..count.., fill = type)) + 
+  geom_histogram(position="dodge") +
+     labs(title="Chlorides distribution",  subtitle = "Histogram Chart",
+       x = "Chlorides", y = "Frequency", fill = "Type") +
+  scale_fill_brewer(palette = "Set1")
+
+grid.arrange(p1,p2,p3,p4, ncol = 2)
+grid.arrange(p5,p6,p7,p8, ncol = 2)
+
+```
+
+By taking a look at dataset, we can see a lot of right skewed distributions (for example, fixed and volatile acidity, residual sugar, chlorides, free and total SO2, density). 
+
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+p9 <- ggplot(data, aes(x=quality, y=..count.., fill = type)) + 
+  geom_histogram(position="dodge") +
+     labs(title="Quality distribution",  subtitle = "Histogram Chart",
+       x = "Quality", y = "Frequency", fill = "Type") +
+  scale_fill_brewer(palette = "Set1")
+  
+p9
+```
+
+The quality ranges from 3 to 8. Most of the scores are 5 and 6 (medium quality). We have very little data for scores at the tails. 
+
+### 2.4.3 Boxplots
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+
+ par(mfrow=c(1,5), oma = c(1,1,0,0) + 0.1,  mar = c(3,3,1,1) + 0.1)
+ 
+  b1 <- ggplot(data, aes(x=fixed.acidity, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Fixed Acidity", x = "Fixed Acidity", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip() 
+  
+  b2 <- ggplot(data, aes(x=volatile.acidity, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Volatile Acidity", x = "Volatile Acidity", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip() 
+  
+  b3 <- ggplot(data, aes(x=citric.acid, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Citric Acid", x = "Citric Acid", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip() 
+
+  b4 <- ggplot(data, aes(x=residual.sugar, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Residual Sugar", x = "Residual Sugar", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip()
+  
+  b5 <- ggplot(data, aes(x=chlorides, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Chlorides", x = "Chlorides", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip()
+  
+  b6 <- ggplot(data, aes(x=alcohol, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Alcohol", x = "Alcohol", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip()
+  
+  b7 <- ggplot(data, aes(x=density, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Density", x = "Density", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip()
+  
+  b8 <- ggplot(data, aes(x=free.sulfur.dioxide, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Free Sulfur Dioxide", x = "Free Sulfur Dioxide", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip()
+  
+  b9 <- ggplot(data, aes(x=pH, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="pH", x = "pH", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip()
+  
+  b10 <- ggplot(data, aes(x=sulphates, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Sulphates", x = "Sulphates", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip()
+  
+  b11 <- ggplot(data, aes(x=free.sulfur.dioxide, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Total Sulfur Dioxide", x = "Total Sulfur Dioxide", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip()
+  
+  b12 <- ggplot(data, aes(x=quality, y=type, fill =type)) + 
+  geom_boxplot() +
+  labs(title="Quality", x = "Quality", y = "Type", fill = "Type") +
+  scale_fill_brewer(palette = "Set1") + coord_flip()
+    
+
+figure_b1 <- multi_panel_figure(columns = 3, rows = 1, panel_label_type = "none")
+
+figure_b2 <- multi_panel_figure(columns = 3, rows = 1, panel_label_type = "none")
+
+figure_b3 <- multi_panel_figure(columns = 3, rows = 1, panel_label_type = "none")
+
+figure_b4 <- multi_panel_figure(columns = 3, rows = 1, panel_label_type = "none")
+
+figure_b1 %<>%
+  fill_panel(b1, column = 1, row = 1) %<>%
+  fill_panel(b2, column = 2, row = 1) %<>%
+  fill_panel(b3, column = 3, row = 1) 
+
+figure_b1
+
+figure_b2 %<>%
+  fill_panel(b4, column = 1, row = 1) %<>%
+  fill_panel(b5, column = 2, row = 1) %<>%
+  fill_panel(b6, column = 3, row = 1) 
+
+figure_b2
+
+figure_b3 %<>%
+  fill_panel(b7, column = 1, row = 1) %<>%
+  fill_panel(b8, column = 2, row = 1) %<>%
+  fill_panel(b9, column = 3, row = 1) 
+
+figure_b3
+
+figure_b4 %<>%
+  fill_panel(b10, column = 1, row = 1) %<>%
+  fill_panel(b11, column = 2, row = 1) %<>%
+  fill_panel(b12, column = 3, row = 1) 
+
+figure_b4
+
+```
+
+
+It can be observed some differences between red wine and white wine:
+
+1. Red Wine: 
+
+- Suphates, free sulfur, density,  Chlorides, Fixed acidity, volatile acidity have a high number of outliers. If those outliers are eliminated then distribution of the variables may be considered to be symmetric.
+
+- Alcohol has an irregular shaped distribution but without pronounced outliers.
+
+- Chlorides are mostly concentrated between 0.5 and 1 g/dm3
+
+- Quality scores are mostly medium (5,6) with very little amount of records at both tails (3 and 8 scores)
+
+- In most cases data is not normally distributed. It will be neccesary to transform the data to make a normal distribution
+
+2. Black Wine: 
+
+- Sulphates, pH, free sulfur,  Chlorides, Citric Acid,  Fixed acidity, volatile acidity have a high number of outliers. If those outliers are eliminated then distribution of the variables may be considered to be symmetric.
+
+- Alcohol and density are quite simmetric.
+
+- Quality scores are mostly medium (5,6) with very little amount of records at both tails (3 and 9 scores)
+
+- In most cases data is not normally distributed. It will be neccesary to transform the data to make a normal distribution
+
+
+### 2.4.4 Variables Correlation
+
+Correlation measures the extent that two variables are related to one another. It is a single-number measure of the relationship between two variables. It's important to remind that correlation doesn’t imply causal relationship
+
+The value of the correlational coefficient varies between +1 and -1
+
+- +1 implies a strong positive association.
+- -1 implies a strong negative association. 
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+#Red Wine
+data_red <- data %>%
+  filter (type =="red") %>%
+  select(-type)
+
+var_correlation <-cor(data_red, use="pairwise.complete.obs")
+corrplot(var_correlation, method="color", 
+         addCoef.col = "black", number.cex = 0.5,  tl.cex=0.8, tl.srt=70,tl.col="black" )
+
+```
+
+The most correlated variables with red wine quality are:
+
+- volatile-acidity (-0.40)
+- alcohol (0.48)
+- citric acid (0.23)
+- sulphates (0.25)
+
+When quality score increase, the volatile-acidity tend to decrease. And when quality score increase, the alcohol level tend to also increase. It's necessary to test these hypotheses with ANOVA test.
+
+In terms of relationships between another independent variables, some strong correlations are observed.
+
+- fixed acidity - density (0.67)
+- fixed acidity - citric acid (0.67)
+- fixed acidity - ph (-0.69)
+
+
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+#White Wine
+data_white <- data %>%
+  filter (type =="white") %>%
+  select(-type)
+
+var_correlation <-cor(data_white, use="pairwise.complete.obs")
+corrplot(var_correlation, method="color", 
+         addCoef.col = "black", number.cex = 0.5,  tl.cex=0.8, tl.srt=70,tl.col="black" )
+
+```
+
+The most correlated variables with white wine quality are:
+
+- density (-0.34)
+- alcohol (0.46)
+- chlorides (-0.22)
+
+When quality score increase, the density tend to decrease. And when quality score increase, the alcohol level tend to also increase. It's necessary to test these hypotheses with ANOVA test.
+
+In terms of relationships between another independent variables, some strong correlations are observed.
+
+- alcohol - density (-0.76)
+- residual sugar - density (0.82)
+
+### 2.4.5 Skewness
+
+If the skewness is between -0.5 and 0.5, the data are fairly symmetrical. If the skewness is between -1 and – 0.5 or between 0.5 and 1, the data are moderately skewed. If the skewness is less than -1 or greater than 1, the data are highly skewed.
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+skewness(data_white$quality)
+skewness(data_red$quality)
+
+skewness(data_white$pH)
+skewness(data_red$pH)
+
+skewness(data_white$density)
+skewness(data_red$density)
+
+skewness(data_white$alcohol)
+skewness(data_red$alcohol)
+
+skewness(data_white$free.sulfur.dioxide)
+skewness(data_red$free.sulfur.dioxide)
+
+skewness(data_white$chlorides)
+skewness(data_red$chlorides)
+
+skewness(data_white$free.sulfur.dioxide)
+skewness(data_red$free.sulfur.dioxide)
+
+```
+
+Skewness does violate a normality assumption. But it can also occur, as in these cases, that we have many outliers that are influencing the final distribution.
+
+
+To fix it, some sort of transformation is probably required. A log/sqrt/inverse transformation might work. It’s not unreasonable to use Box-Cox to suggest a transformation for predictor variables, so that would be one method.  It will be neccesary to transform the data to make a normal distribution
+
+### 2.4.6 Probability Plot
+
+The normal probability plot (Chambers et al., 1983) is a graphical technique for assessing whether or not a data set is approximately normally distributed
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+
+  pp1 <- ggplot(mapping = aes(sample = data_white$alcohol)) +
+  stat_qq_point(size = 2,color = "#377EB8")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - Alcohol (White Wine)")
+
+  pp2 <- ggplot(mapping = aes(sample = data_red$alcohol)) +
+  stat_qq_point(size = 2,color = "#E41A1C")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+     labs(title=" Prob. Plot - Alcohol (Red Wine)")
+  
+  pp3 <- ggplot(mapping = aes(sample = data_white$fixed.acidity)) +
+  stat_qq_point(size = 2,color = "#377EB8")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - Fixed Acidity (White Wine)")
+
+  pp4 <- ggplot(mapping = aes(sample = data_red$fixed.acidity)) +
+  stat_qq_point(size = 2,color = "#E41A1C")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - Fixed Acidity (Red Wine)")
+
+grid.arrange(pp1,pp2,pp3,pp4, ncol = 2)
+```
+
+```{r, collapse=FALSE, echo=FALSE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+  pp5 <- ggplot(mapping = aes(sample = data_white$volatile.acidity)) +
+  stat_qq_point(size = 2,color = "#377EB8")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - Volatile acidity (White Wine)")
+
+  pp6 <- ggplot(mapping = aes(sample = data_red$volatile.acidity)) +
+  stat_qq_point(size = 2,color = "#E41A1C")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - Volatile Acidity (Red Wine)")
+ 
+  pp7 <- ggplot(mapping = aes(sample = data_white$citric.acid)) +
+  stat_qq_point(size = 2,color = "#377EB8")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - Citric acidity (White Wine)")
+
+  pp8 <- ggplot(mapping = aes(sample = data_red$citric.acid)) +
+  stat_qq_point(size = 2,color = "#E41A1C")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - Citric Acidity (Red Wine)")
+  
+   pp9 <- ggplot(mapping = aes(sample = data_white$residual.sugar)) +
+  stat_qq_point(size = 2,color = "#377EB8")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - Residual Sugar (White Wine)")
+
+  pp10 <- ggplot(mapping = aes(sample = data_red$residual.sugar)) +
+  stat_qq_point(size = 2,color = "#E41A1C")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - Residual Sugar (Red Wine)")
+ 
+  pp11 <- ggplot(mapping = aes(sample = data_white$chlorides)) +
+  stat_qq_point(size = 2,color = "#377EB8")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - chlorides (White Wine)")
+
+  pp12 <- ggplot(mapping = aes(sample = data_red$chlorides)) +
+  stat_qq_point(size = 2,color = "#E41A1C")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Prob. Plot - chlorides (Red Wine)")
+ 
+
+ grid.arrange(pp5,pp6,pp7,pp8, ncol = 2) 
+ grid.arrange(pp9,pp10,pp11,pp12, ncol = 2) 
+
+```
+
+A straight, diagonal line means that you have normally distributed data. If the line is skewed to the left or right, it means that you do not have normally distributed data. It can be confirmed what has been analyzed throughout the study, it cannot be assumed normality in the variables, so the variables need to be transformed. 
+
+
+### 2.4.7 Data Transformation
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+# Center, scale, and transform red wine data
+preprocess_redwine <- preProcess(data_red[,1:11], c("BoxCox", "center", "scale"), na.remove = TRUE)
+new_datared <- data.frame(trans = predict(preprocess_redwine, data_red))
+colnames(new_datared)
+
+# Center, scale, and transform white wine data
+preprocess_whitewine <- preProcess(data_white[,1:11], c("BoxCox", "center", "scale"), na.remove = TRUE)
+new_datawhite <- data.frame(trans = predict(preprocess_whitewine, data_white))
+colnames(new_datawhite)
+```
+
+### 2.4.8 Remove Outliers
+
+The extreme outliers will be removed to facilitate the analysis and the visualization
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+new_datawhite <- new_datawhite[!abs(new_datawhite$trans.fixed.acidity) > 3,]
+new_datawhite <- new_datawhite[!abs(new_datawhite$trans.volatile.acidity) > 3,]
+new_datawhite <- new_datawhite[!abs(new_datawhite$trans.citric.acid) > 3,]
+new_datawhite <- new_datawhite[!abs(new_datawhite$trans.residual.sugar) > 3,]
+new_datawhite <- new_datawhite[!abs(new_datawhite$trans.chlorides) > 3,]
+new_datawhite <- new_datawhite[!abs(new_datawhite$trans.density) > 3,]
+new_datawhite <- new_datawhite[!abs(new_datawhite$trans.pH) > 3,]
+new_datawhite <- new_datawhite[!abs(new_datawhite$trans.sulphates) > 3,]
+new_datawhite <- new_datawhite[!abs(new_datawhite$trans.alcohol) > 3,]
+
+new_datared <- new_datared[!abs(new_datared$trans.fixed.acidity) > 3,]
+new_datared <- new_datared[!abs(new_datared$trans.volatile.acidity) > 3,]
+new_datared <- new_datared[!abs(new_datared$trans.citric.acid) > 3,]
+new_datared <- new_datared[!abs(new_datared$trans.residual.sugar) > 3,]
+new_datared <- new_datared[!abs(new_datared$trans.chlorides) > 3,]
+new_datared <- new_datared[!abs(new_datared$trans.density) > 3,]
+new_datared <- new_datared[!abs(new_datared$trans.pH) > 3,]
+new_datared <- new_datared[!abs(new_datared$trans.sulphates) > 3,]
+new_datared <- new_datared[!abs(new_datared$trans.alcohol) > 3,]
+```
+
+Checking for normal distribution: 
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+ t1 <- ggplot(mapping = aes(sample = data_white$chlorides)) +
+  stat_qq_point(size = 2,color = "#377EB8")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Before Transformation - Alcohol (White Wine)")
+
+ t2 <- ggplot(mapping = aes(sample = new_datawhite$trans.chlorides)) +
+  stat_qq_point(size = 2,color = "#377EB8")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" After Transformation - Residual Sugar (White Wine)")
+
+ t3 <- ggplot(mapping = aes(sample = data_red$chlorides)) +
+  stat_qq_point(size = 2,color = "#E41A1C")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" Before Transformation - Residual Sugar (Red Wine)")
+
+ t4 <- ggplot(mapping = aes(sample = new_datared$trans.chlorides)) +
+  stat_qq_point(size = 2,color = "#E41A1C")  +
+  stat_qq_line(color="black") +
+ xlab("x-axis") + ylab("y-axis") +
+  labs(title=" After Transformation - Residual Sugar (Red Wine)")
+ 
+
+  grid.arrange(t1,t2,t3,t4, ncol = 2)  
+
+```
+
+### 2.4.9 Correlation with the transformed variables
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+var_correlation <-cor(new_datawhite, use="pairwise.complete.obs")
+corrplot(var_correlation, method="color", 
+         addCoef.col = "black", number.cex = 0.5,  tl.cex=0.8, tl.srt=70,tl.col="black" )
+```
+
+The most correlated variables with white wine quality are:
+
+- density (-0.34)
+- alcohol (0.45)
+- chlorides (-0.31)
+- volatile acidity (-0.18)
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+var_correlation <-cor(new_datared, use="pairwise.complete.obs")
+corrplot(var_correlation, method="color", 
+         addCoef.col = "black", number.cex = 0.5,  tl.cex=0.8, tl.srt=70,tl.col="black" )
+```
+
+The most correlated variables with red wine quality are:
+
+- volatile-acidity (-0.40)
+- alcohol (0.49)
+- sulphates (0.38)
+- citric acid (0.24)
+
+### 2.4.10 Process Capability
+
+Process Capability Indices (PCI) are considered some of the fundamentals quality
+measurement tools needed. This because they evaluate related process performance, and compare one material or supplier with others, when applied properly to improve process control performance.
+
+The the capacity of a process can only performed when the process is under control. So 9 samples are taken of size 20 and 30 respectively, to analyze the process capability for red wine and black wine. Then, it will be checked that all of the samples come from a situation that is in control.
+
+```{r, collapse=FALSE, echo=FALSE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+set.seed(3)
+sample1_r <- sample(data_red$quality, size=20)
+sample2_r <- sample(data_red$quality, size=20)
+sample3_r <- sample(data_red$quality, size=20)
+sample4_r <- sample(data_red$quality, size=20)
+sample5_r <- sample(data_red$quality, size=20)
+sample6_r <- sample(data_red$quality, size=20)
+sample7_r <- sample(data_red$quality, size=20)
+sample8_r <- sample(data_red$quality, size=20)
+sample9_r <- sample(data_red$quality, size=20)
+sample_red <- cbind(sample1_r,sample2_r,sample3_r,sample4_r,sample5_r,sample6_r,sample7_r,sample8_r,sample9_r)
+
+sample1_b <- sample(data_white$quality, size=20)
+sample2_b <- sample(data_white$quality, size=20)
+sample3_b <- sample(data_white$quality, size=20)
+sample4_b <- sample(data_white$quality, size=20)
+sample5_b <- sample(data_white$quality, size=20)
+sample6_b <- sample(data_white$quality, size=20)
+sample7_b <- sample(data_white$quality, size=20)
+sample8_b <- sample(data_white$quality, size=20)
+sample9_b <- sample(data_white$quality, size=20)
+sample_white <- cbind(sample1_b,sample2_b,sample3_b,sample4_b,sample5_b,sample6_b,sample7_b,sample8_b,sample9_b)
+```
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+red_range <- qcc(data = sample_red, type = "R", plot = T)
+red_average <- qcc(data = sample_red, type = "xbar", plot = T)
+
+white_range <- qcc(data = sample_white, type = "R", plot = T)
+white_average <- qcc(data = sample_white, type = "xbar", plot = T)
+
+```
+
+As we can see both processes are under control, based on the R-Chart and the X-bar chart. Thanks to this, the capacity of the process can be checked. The specification limits in this wine production process in quality terms are 3 and 9, and the target is a quality of 7 
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+lsl=3;usl=9
+target=7
+process.capability(white_average, spec.limits=c(lsl,usl),target=target)
+process.capability(red_average, spec.limits=c(lsl,usl),target=target)
+```
+
+
+Cp, measures a process's potential capability, which is defined as the allowable spread over the actual spread. By convention, when a process has a Cp value less than 1.0, it is considered potentially incapable of meeting specification requirements. Conversely, when a process Cp is greater than or equal to 1.0, the process has the potential of being capable.
+
+Cpk measures how close the process is to the target and how consistent the process is around the average performance.Cpk of less than 1.66 needs a closer look. A Cpk that's less than 1.33 needs some action to make it higher, and a Cpk of less than 1.0 means that the process is not capable of meeting its requirements. In this case, these are the values: 
+
+- Red wine has a Cp = 1.49 and CpK = 1.33 
+- Black wine has a Cp = 1.24 and CpK = 1.11
+
+These means that our process is capable, but it is needed to take some actions to improve it.
+
+
+
+## 3. Analysis Phase
+
+### 3.1 Hypothesis Tests
+
+- Hypothesis 1 - Quality is independent on alcohol concentration.
+
+  - Null Hypothesis :  Quality is independent on alcohol concentration.
+
+  - Alternative Hypothesis :  Quality is not independent on alcohol concentration.
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+t.test(data$alcohol, data$quality, var.equal = TRUE)
+```
+The p-value is less 0.05 hence the null hypothesis can be rejected.Thus, there is significant difference between alcohol concentration and quality of wine. Quality is dependent on alcohol concentration and hence it can be used for analysis. There is significant difference in alcohol concentration in high and low quality wine.
+
+
+- Hypothesis 2 - Quality is independent on volatile-acid in red wine
+
+  - Null Hypothesis :  Quality is independent on volatile-acid in red wine.
+
+  - Alternative Hypothesis :  Quality is not independent on on volatile-acid in red wine concentration.
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+t.test(data_red$volatile.acidity, data_red$quality, var.equal = TRUE)
+```
+
+The p-value is less 0.05 hence the null hypothesis can be rejected.Thus, there is significant difference between volatile acidity and quality of wine. Quality is dependent on volatile acidity and hence it can be used for analysis. There is significant difference in volatile acidity concentration in high and low quality wine.
+
+- Hypothesis 3 - Quality is independent on density in white wine
+
+  - Null Hypothesis :  Quality is independent on density in white wine.
+
+  - Alternative Hypothesis :  Quality is not independent density in white wine  concentration.
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+t.test(data_white$density, data_white$quality, var.equal = TRUE)
+```
+
+The p-value is less 0.05 hence the null hypothesis can be rejected.Thus, there is significant difference between density and quality of white wine. Quality is dependent on density and hence it can be used for analysis. There is significant difference in density concentration in high and low quality wine.
+
+
+- Hypothesis 4 - Quality is independent on citric acid in red wine
+
+  - Null Hypothesis :  Quality is independent on citric acid in red wine.
+
+  - Alternative Hypothesis :  Quality is not independent on citric acid in red wine.
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+t.test(data_red$citric.acid, data_red$quality, var.equal = TRUE)
+```
+
+The p-value is less 0.05 hence the null hypothesis can be rejected. Thus, there is significant difference between citric acid and quality of red wine
+
+- Hypothesis 5 - Quality is independent on sulphates in red wine
+
+  - Null Hypothesis :  Quality is independent on sulphates in red wine.
+
+  - Alternative Hypothesis :  Quality is not independent on sulphates in red wine.
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+t.test(data_red$sulphates, data_red$quality, var.equal = TRUE)
+```
+
+The p-value is less 0.05 hence the null hypothesis can be rejected. Thus, there is significant difference between sulphates and quality of red wine
+
+
+- Hypothesis 6 - There is no significant difference between quality of red wine and quality of white wine
+
+  - Null Hypothesis :  There is no significant difference between quality of red wine and quality of white wine
+
+  - Alternative Hypothesis :  There is significant difference between quality of red wine and quality of white wine
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+t.test(data_white$quality, data_red$quality, var.equal = TRUE)
+```
+
+We reject our null hypothesis since p < 0.05.White wine had a higher mean quality of 5.85 as compared to Red wine which had a mean quality of 5.62.
+This t test showed there was a significant difference in quality between Red and White wine.
+
+### 3.2 Regression Analysis
+
+Regression Analysis allow to identify the relationship between a continuous  variable (X) and a continuous output variable (Y).
+
+And linear regression is a linear approach to modelling the relationship between a scalar response and one or more explanatory variables. In this case it will be used the  lm function, which stands for linear model, and it is used to build a linear regression model.
+
+- Y variable: White and Red Wine
+- Possible X variables: alcohol, density, volatile acidity, citric acid, chrolides, sulphates
+
+
+```{r, collapse=FALSE, echo=TRUE, results='markup', error=FALSE, message=FALSE, warning=FALSE}
+
+Model_red<- lm(trans.quality~trans.alcohol+trans.volatile.acidity+trans.citric.acid+trans.sulphates+trans.density,data=new_datared)
+summary(Model_red)
+
+Model_white<- lm(trans.quality~trans.alcohol+trans.density+trans.chlorides+trans.volatile.acidity,data=new_datawhite)
+summary(Model_white)
+```
+
+These are the models that identifies the low and high quality wines. So this can allow us to improve the process and adjust it to that regression function.  Multiple R-squared will always increase if you add more independent variables.
+But Adjusted R-squared will decrease if you add an independent variable that does not help the model. In this case the Rsquare is 36% and 25% respectively. 
+
+Through this analysis, we can see that:
+
+- Alcohol, density, chlorides, volatile acidity are  factors which affect quality level in an interpretable manner in the white wine. 
+
+- Alcohol, volatile acidity, citric acid, sulphates and density are  factors which affect quality level in an interpretable manner in the red wine. 
+
+Those functions can be used to ensure the wine quality in our factory
+
+## 4. Improve Phase
+
+Once we know the few Xs that affect our Y or problem thanks to previous phase,  next step is to generate potential solutions for improvement concerning those Xs. Here you can find some ways to generate these solutions:
+
+- Brainstorming with the team
+- Standardization
+- 5S techniques
+- Visual Management
+- Poka Yoke Techniques
+- Benchmarking 
+
+
+## 5. Control Phase
+
+In this phase is necessary to ensure a capable, predictable, and stable process. 
+
+- Implement a control system or statistical process control of the variables which want to be controlled because the new improvements are running, so, this control will realize about the positive or negative changes
+
+- Standardize the new process
+
+- Document lessons learned of the project and close it
+
+
